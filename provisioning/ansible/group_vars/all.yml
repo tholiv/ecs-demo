@@ -1,4 +1,5 @@
 ---
-region: au-southeast-2
+region: ap-southeast-2
 stack_prefix: tholiv
+iam_user_arn: arn:aws:iam::552586331305:user/thiago
 

@@ -1,6 +1,6 @@
 ---
 - name: Render ECR Template
-  template: src=ecr.json.j2 dest=rendered_templates/ecr.json
+  template: src=ecr.yml.j2 dest=rendered_templates/ecr.yml
 
 - name: Create ECR Stack
   cloudformation:
@@ -8,7 +8,10 @@
     state: present
     region: "{{region}}"
     disable_rollback: true
-    template: rendered_templates/ecr.json
+    template: rendered_templates/ecr.yml
+    template_format: yaml
+    template_parameters:
+     IAMARN: "{{iam_user_arn}}"
     tags:
       Stack: "{{stack_prefix}}-ecr"
 
