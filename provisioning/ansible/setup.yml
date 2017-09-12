@@ -1,0 +1,6 @@
+---
+- name: Setup ECR and proper permissions
+  hosts: localhost
+  roles:
+    - ecr
+
