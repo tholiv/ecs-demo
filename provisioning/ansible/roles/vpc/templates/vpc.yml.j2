@@ -1,0 +1,94 @@
+#jinja2:lstrip_blocks:False,trim_blocks:False
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: Base Network Infrastructure
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: {{ vpc.cidr }}
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: {{ stack_prefix | lower }}_vpc
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: {{ stack_prefix | lower }}_ig
+
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: { Ref: Vpc }
+      InternetGatewayId: { Ref: InternetGateway }
+
+  SourceSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref Vpc
+      GroupDescription: Sample source security group
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: {{ stack_prefix | lower }}_source_sg
+
+  TargetSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref Vpc
+      GroupDescription: ALL Inbound TCP - Source Restricted to SourceSG
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: {{ stack_prefix | lower }}_target_sg
+
+  InboundRule:
+    Type: AWS::EC2::SecurityGroupIngress
+    DependsOn:
+      - Vpc 
+    Properties:
+      IpProtocol: tcp
+      FromPort: 0
+      ToPort: 65535
+      SourceSecurityGroupId: !GetAtt 
+        - TargetSG
+        - GroupId
+      GroupId: !GetAtt 
+        - TargetSG
+        - GroupId
+
+  OutboundRule:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      IpProtocol: tcp
+      FromPort: 0
+      ToPort: 65535
+      DestinationSecurityGroupId: !GetAtt 
+        - TargetSG
+        - GroupId
+      GroupId: !GetAtt 
+        - SourceSG
+        - GroupId
+
+Outputs:
+  Vpc:
+    Value: !Ref Vpc
+  InternetGateway:
+    Value: !Ref InternetGateway
+  SourceSG:
+    Value: !Ref SourceSG
+  TargetSG:
+    Value: !Ref TargetSG

@@ -1,0 +1,77 @@
+#jinja2:lstrip_blocks:False,trim_blocks:False
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: Base Network Infrastructure
+
+Parameters:
+  Vpc:
+    Type: String
+
+Resources:
+
+# Route Tables #
+  InternalRouteTbl:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: { Ref: Vpc }
+      Tags:
+        - Key: Name
+          Value: {{ stack_prefix | lower }}-internal-rt
+
+  ExternalRouteTbl:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: { Ref: Vpc }
+      Tags:
+        - Key: Name
+          Value: {{ stack_prefix | lower }}-external-rt
+
+# Subnets and Associations #
+{% for segment_name,segment in segments.iteritems() %}
+  {% set segment_cidr = vpc.cidr | ipsubnet(vpc.slash, loop.index0) %}
+  {% for subnet in range(1, segment.azs + 1) %}
+  # Subnets #
+  {{ segment_name }}Subnet{{ subnet }}:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: {{ lookup('get_azs', region).split(',')[subnet - 1] }}
+      CidrBlock: {{ segment_cidr| ipsubnet(segment.slash, subnet - 1) }}
+      VpcId: { Ref: Vpc }
+      Tags:
+        - Key: Name
+          Value: {{ stack_prefix | lower }}-{{ segment_name | lower }}
+
+  # Associate Subnet with RouteTable #
+  {% if segment_name == 'Public' %}
+    {% set route_table_name = 'ExternalRouteTbl' %}
+  {% else %}
+    {% set route_table_name = 'InternalRouteTbl' %}
+  {% endif %}
+
+  {{ segment_name }}RouteTblAss{{ subnet }}:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: { Ref: {{ route_table_name }} }
+      SubnetId: { Ref: {{ segment_name }}Subnet{{ subnet }} }
+
+  {% endfor %}
+{% endfor %}
+
+Outputs:
+{% for segment_name,segment in segments.iteritems() %}
+  {{ segment_name }}Subnets:
+    Value:
+      "Fn::Join":
+        - ","
+        -
+        {% for subnet in range(1, segment.azs + 1) %}
+          - !Ref {{ segment_name }}Subnet{{ subnet }}
+        {% endfor %}
+{% endfor %}
+  PublicSubnet1:
+    Value: !Ref PublicSubnet1
+  PublicSubnet2:
+    Value: !Ref PublicSubnet2
+  PublicSubnet3:
+    Value: !Ref PublicSubnet3

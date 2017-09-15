@@ -1,0 +1,17 @@
+---
+- name: Render IAM Template
+  template: src=iam.yml.j2 dest=rendered_templates/iam.yml
+
+- name: Create/Update IAM Stack
+  cloudformation:
+    stack_name: "{{stack_prefix}}-iam"
+    state: present
+    region: "{{region}}"
+    disable_rollback: true
+    template: rendered_templates/iam.yml
+    #template_parameters:
+    # IAMARN: "{{iam_user_arn}}"
+    tags:
+      Stack: "{{stack_prefix}}-iam"
+
+  register: iam_stack

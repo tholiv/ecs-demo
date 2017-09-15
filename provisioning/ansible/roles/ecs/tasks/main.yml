@@ -1,0 +1,19 @@
+---
+- name: Render ECS Template
+  template: src=ecs.yml.j2 dest=rendered_templates/ecs.yml
+
+- name: Create/Update ECS Stack
+  cloudformation:
+    stack_name: "{{stack_prefix}}-ecs"
+    state: present
+    region: "{{region}}"
+    disable_rollback: true
+    template: rendered_templates/ecs.yml
+    template_parameters:
+      Vpc: "{{vpc_stack.stack_outputs.Vpc}}"
+      ECSRepoName: "{{ecr_stack.stack_outputs.ECSRepository}}"
+      ImageTag: "{{image_tag}}"
+    tags:
+      Stack: "{{stack_prefix}}-ecs"
+
+  register: ecs_stack

@@ -1,0 +1,128 @@
+#jinja2:lstrip_blocks:False,trim_blocks:False
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: EC2 related components
+
+Parameters:
+#  Vpc:
+#    Type: String
+  PublicSubnet1:
+    Type: String
+  PublicSubnet2:
+    Type: String
+  PublicSubnet3:
+    Type: String
+  SourceSG:
+    Type: String
+  TargetSG:
+    Type: String
+  DesiredCapacity:
+    Type: Number
+  MaxSize:
+    Type: Number
+  EC2InstanceProfile:
+    Type: String
+  KeyName:
+    Type: String
+
+Resources:
+  EcsCluster:
+    Type: AWS::ECS::Cluster
+
+  EcsElb:
+    Type: AWS::ElasticLoadBalancing::LoadBalancer
+    Properties:
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+        - !Ref PublicSubnet3
+      Listeners:
+        - LoadBalancerPort: 80
+          InstancePort: 80
+          Protocol: HTTP
+      SecurityGroups:
+        - !Ref SourceSG
+        - !Ref TargetSG
+      HealthCheck:
+        Target: 'HTTP:80/'
+        HealthyThreshold: 2
+        UnhealthyThreshold: 10
+        Interval: 30
+        Timeout: 5
+
+  ECSAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+        - !Ref PublicSubnet3
+      LaunchConfigurationName: !Ref ContainerInstances
+      MinSize: 1
+      MaxSize: !Ref MaxSize
+      DesiredCapacity: !Ref DesiredCapacity
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT15M
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: 1
+        MaxBatchSize: 1
+        PauseTime: PT15M
+        WaitOnResourceSignals: true
+
+  ContainerInstances:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Metadata:
+      'AWS::CloudFormation::Init':
+        config:
+          commands:
+            01_add_instance_to_cluster:
+              command: !Sub
+                '#!/bin/bash
+                 echo ECS_CLUSTER=!Ref EcsCluster >> /etc/ecs/ecs.config'
+          files:
+            /etc/cfn/cfn-hup.conf:
+              content: !Sub | 
+                [main]
+                stack= !Ref 'AWS::StackId'
+                region= !Ref 'AWS::Region'
+              mode: '000400'
+              owner: root
+              group: root
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+              content: !Sub | 
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.ContainerInstances.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -v --stack !Ref 'AWS::StackName' --resource ContainerInstances --region !Ref 'AWS::Region'
+                runas=root
+          services:
+            sysvinit:
+              cfn-hup:
+                enabled: 'true'
+                ensureRunning: 'true'
+                files:
+                  - /etc/cfn/cfn-hup.conf
+                  - /etc/cfn/hooks.d/cfn-auto-reloader.conf
+    Properties:
+      ImageId: "ami-43547120"
+      SecurityGroups:
+        - !Ref SourceSG
+        - !Ref TargetSG
+      InstanceType: t2.micro
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      KeyName: !Ref KeyName
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          yum install -y aws-cfn-bootstrap
+          /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource ContainerInstances --region ${AWS::Region}
+          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource ECSAutoScalingGroup --region ${AWS::Region}
+
+Outputs:
+  EcsCluster:
+    Value: !Ref EcsCluster
+  EcsElb:
+    Value: !Ref EcsElb

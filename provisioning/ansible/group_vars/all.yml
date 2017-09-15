@@ -2,4 +2,18 @@
 region: ap-southeast-2
 stack_prefix: tholiv
 iam_user_arn: arn:aws:iam::552586331305:user/thiago
+vpc:
+  cidr: 10.0.0.0/16
+  slash: 24
+segments:
+  Public:
+    azs: 3
+    slash: 26 # size of AZ subnets in each segment
+  Private:
+    azs: 3
+    slash: 26 # size of AZ subnets in each segment
+image_tag: v1
+desired_capacity: 1 # Number of instances to launch in your ECS cluster
+max_size: 2
+key_name: ecs_demo # Name of an existing EC2 KeyPair for SSH access to the instances
 

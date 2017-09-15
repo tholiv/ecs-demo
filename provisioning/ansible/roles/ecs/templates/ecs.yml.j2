@@ -1,0 +1,55 @@
+#jinja2:lstrip_blocks:False,trim_blocks:False
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: ECS Cluster
+
+Parameters:
+  Vpc:
+    Type: String
+  ECSRepoName:
+    Type: String
+  ImageTag:
+    Type: String
+  EcsElb:
+    Type: String
+
+Resources:
+  EcsService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - ECSAutoScalingGroup
+    Properties:
+      Cluster: !Ref EcsCluster
+      DesiredCount: '1'
+      DeploymentConfiguration:
+        MaximumPercent: 100
+        MinimumHealthyPercent: 0
+      LoadBalancers:
+        - ContainerName: php-simple-app
+          ContainerPort: '80'
+          LoadBalancerName: !Ref EcsElb
+      Role: !Ref EcsServiceRole
+      TaskDefinition: !Ref PhpTaskDefinition
+
+  PhpTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      ContainerDefinitions:
+        - Name: php-simple-app
+          Cpu: 10
+          Essential: 'true'
+          Image: !Join 
+            - ''
+            - - !Ref AWS::AccountId
+              - .dkr.ecr.{{region}}.amazonaws.com/
+              - !Ref ECSRepoName
+              - ':'
+              - !Ref ImageTag
+          Memory: 300
+          PortMappings:
+            - HostPort: 80
+              ContainerPort: 80
+      Volumes:
+        - Name: my-vol
+

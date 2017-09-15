@@ -1,0 +1,25 @@
+---
+- name: Render EC2 Template
+  template: src=ec2.yml.j2 dest=rendered_templates/ec2.yml
+
+- name: Create/Update EC2 Stack
+  cloudformation:
+    stack_name: "{{stack_prefix}}-ec2"
+    state: present
+    region: "{{region}}"
+    disable_rollback: true
+    template: rendered_templates/ec2.yml
+    template_parameters:
+      PublicSubnet1: "{{network_stack.stack_outputs.PublicSubnet1}}"
+      PublicSubnet2: "{{network_stack.stack_outputs.PublicSubnet2}}"
+      PublicSubnet3: "{{network_stack.stack_outputs.PublicSubnet3}}"
+      SourceSG: "{{vpc_stack.stack_outputs.SourceSG}}"
+      TargetSG: "{{vpc_stack.stack_outputs.TargetSG}}"
+      DesiredCapacity: "{{desired_capacity}}"
+      MaxSize: "{{max_size}}"
+      EC2InstanceProfile: "{{iam_stack.stack_outputs.EC2InstanceProfile}}"
+      KeyName: "{{key_name}}"
+    tags:
+      Stack: "{{stack_prefix}}-ec2"
+
+  register: ec2_stack

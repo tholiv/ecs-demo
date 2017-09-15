@@ -2,5 +2,11 @@
 - name: Setup ECR and proper permissions
   hosts: localhost
   roles:
+    - vpc
+    - network
     - ecr
+    - iam
+    - ec2
+    #- ecs
+
 
